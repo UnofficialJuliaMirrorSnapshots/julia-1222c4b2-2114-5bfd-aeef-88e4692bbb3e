@@ -1,0 +1,79 @@
+JULIAHOME := $(abspath ../..)
+BUILDDIR := .
+include $(JULIAHOME)/Make.inc
+
+JCFLAGS += $(CFLAGS)
+JCXXFLAGS += $(CXXFLAGS)
+JCPPFLAGS += $(CPPFLAGS)
+JLDFLAGS += $(LDFLAGS)
+
+SRCS := hashing timefuncs ptrhash operators utf8 ios htable bitvector \
+	int2str libsupportinit arraylist strtod
+ifeq ($(OS),WINNT)
+SRCS += asprintf strptime win32_ucontext
+ifeq ($(ARCH),i686)
+SRCS += _setjmp.win32
+else ifeq ($(ARCH),x86_64)
+SRCS += _setjmp.win64
+endif
+endif
+ifeq ($(USEMSVC), 1)
+SRCS += dirname
+endif
+
+HEADERS := $(wildcard *.h) $(LIBUV_INC)/uv.h
+
+OBJS := $(SRCS:%=$(BUILDDIR)/%.o)
+DOBJS := $(SRCS:%=$(BUILDDIR)/%.dbg.obj)
+
+FLAGS := $(HFILEDIRS:%=-I%) -I$(LIBUV_INC) -I$(UTF8PROC_INC) -DLIBRARY_EXPORTS -DUTF8PROC_EXPORTS
+ifneq ($(USEMSVC), 1)
+FLAGS += -Wall -Wno-strict-aliasing -fvisibility=hidden -Wpointer-arith -Wundef
+JCFLAGS += -Wold-style-definition -Wstrict-prototypes -Wc++-compat
+endif
+
+DEBUGFLAGS += $(FLAGS)
+SHIPFLAGS += $(FLAGS)
+
+default: release
+
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(BUILDDIR)/%.o: %.c $(HEADERS) | $(BUILDDIR)
+	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(JCFLAGS) $(SHIPFLAGS) $(DISABLE_ASSERTIONS) -c $< -o $@)
+$(BUILDDIR)/%.dbg.obj: %.c $(HEADERS) | $(BUILDDIR)
+	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(JCFLAGS) $(DEBUGFLAGS) -c $< -o $@)
+ifneq ($(USEMSVC), 1)
+$(BUILDDIR)/%.o: %.S | $(BUILDDIR)
+	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(SHIPFLAGS) -c $< -o $@)
+$(BUILDDIR)/%.dbg.obj: %.S | $(BUILDDIR)
+	@$(call PRINT_CC, $(CC) $(JCPPFLAGS) $(DEBUGFLAGS) -c $< -o $@)
+else
+$(BUILDDIR)/%.o: %.S | $(BUILDDIR)
+	@$(call PRINT_CC, $(CPP) -P $(JCPPFLAGS) $(SHIPFLAGS) $<)
+	@$(call PRINT_CC, $(AS) $(JCPPFLAGS) $(SHIPFLAGS) -Fo $@ -c $*.i)
+$(BUILDDIR)/%.dbg.obj: %.S | $(BUILDDIR)
+	@$(call PRINT_CC, $(CPP) -P $(JCPPFLAGS) $(DEBUGFLAGS) $<)
+	@$(call PRINT_CC, $(AS) $(JCPPFLAGS) $(DEBUGFLAGS) -Fo $@ -c $*.i)
+endif
+
+release: $(BUILDDIR)/libsupport.a
+debug: $(BUILDDIR)/libsupport-debug.a
+
+$(BUILDDIR)/libsupport.a: $(OBJS)
+	rm -rf $@
+	@$(call PRINT_LINK, $(AR) -rcs $@ $^)
+
+$(BUILDDIR)/libsupport-debug.a: $(DOBJS)
+	rm -rf $@
+	@$(call PRINT_LINK, $(AR) -rcs $@ $^)
+
+clean:
+	rm -f $(BUILDDIR)/*.o
+	rm -f $(BUILDDIR)/*.dbg.obj
+	rm -f $(BUILDDIR)/*.a
+	rm -f $(BUILDDIR)/*~ *#
+	rm -f $(BUILDDIR)/core*
+	rm -f $(BUILDDIR)/libsupport.a
+	rm -f $(BUILDDIR)/libsupport-debug.a
