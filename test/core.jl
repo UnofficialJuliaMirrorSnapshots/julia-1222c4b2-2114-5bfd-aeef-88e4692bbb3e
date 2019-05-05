@@ -650,6 +650,18 @@ let
     @test isassigned(a,1)
     @test isassigned(a)
     @test !isassigned(a,2)
+    a = Array{Float64}(undef, 2, 2, 2)
+    @test isassigned(a,1)
+    @test isassigned(a)
+    @test !isassigned(a,9)
+    a = Array{Float64}(undef, 1)
+    @test isassigned(a,1)
+    @test isassigned(a)
+    @test !isassigned(a,2)
+    a = Array{Float64}(undef, 2, 2, 2, 2)
+    @test isassigned(a,1)
+    @test isassigned(a)
+    @test !isassigned(a,17)
 end
 
 # isassigned, issue #11167
@@ -6915,3 +6927,24 @@ TupleOf31406(cols::Union{Shape31406,Type}...) = TupleOf31406(collect(Shape31406,
         end
         true
     end
+
+# Issue #31783
+struct LL31783{T}
+    x::T
+end
+foo31783(tv::TypeVar) = tv.ub == Any ? Union{tv,LL31783{tv}} : tv
+@test isa(foo31783(TypeVar(:T)),Union)
+
+# Issue #31649
+struct sparse_t31649
+    val::Vector{Float64}
+    sub::Vector{Int64}
+end
+Base.convert(::Any, v::sparse_t31649) = copy(v.val)
+let spvec = sparse_t31649(zeros(Float64,5), Vector{Int64}())
+    @test_throws MethodError repr(spvec)
+    # Try manually putting the problematic method into the cache (in
+    # the original issue compiling the showerror method caused this to happen)
+    @test convert(Any, nothing) === nothing
+    @test_throws MethodError repr(spvec)
+end
