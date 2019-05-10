@@ -64,7 +64,6 @@ jl_sym_t *failed_sym;
 jl_sym_t *runnable_sym;
 
 extern size_t jl_page_size;
-jl_datatype_t *jl_task_type;
 static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner);
 static void jl_set_fiber(jl_ucontext_t *t);
 static void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t);
@@ -72,6 +71,15 @@ static void jl_swap_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t);
 
 #ifdef JL_HAVE_UNW_CONTEXT
 static JL_THREAD unw_cursor_t jl_basecursor;
+#endif
+
+#ifdef ALWAYS_COPY_STACKS
+# ifndef COPY_STACKS
+# error "ALWAYS_COPY_STACKS requires COPY_STACKS"
+# endif
+static int always_copy_stacks = 1;
+#else
+static int always_copy_stacks = 0;
 #endif
 
 #ifdef COPY_STACKS
@@ -323,7 +331,10 @@ static void ctx_switch(jl_ptls_t ptls, jl_task_t **pt)
             jl_swap_fiber(lastt_ctx, &t->ctx);
     }
     else {
-        jl_start_fiber(lastt_ctx, &t->ctx);
+        if (always_copy_stacks)
+            jl_longjmp(ptls->base_ctx.uc_mcontext, 1);
+        else
+            jl_start_fiber(lastt_ctx, &t->ctx);
     }
     // TODO: mutex unlock the thread we just switched from
 #ifdef ENABLE_TIMINGS
@@ -459,12 +470,13 @@ JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion
     t->copy_stack = 0;
     if (ssize == 0) {
         // stack size unspecified; use default
-#if defined(COPY_STACKS) && defined(ALWAYS_COPY_STACKS)
-        t->copy_stack = 1;
-        t->bufsz = 0;
-#else
-        t->bufsz = JL_STACK_SIZE;
-#endif
+        if (always_copy_stacks) {
+            t->copy_stack = 1;
+            t->bufsz = 0;
+        }
+        else {
+            t->bufsz = JL_STACK_SIZE;
+        }
     }
     else {
         // user requested dedicated stack of a certain size
@@ -522,38 +534,6 @@ JL_DLLEXPORT jl_value_t *jl_get_current_task(void)
 // Do one-time initializations for task system
 void jl_init_tasks(void) JL_GC_DISABLED
 {
-    jl_task_type = (jl_datatype_t*)
-        jl_new_datatype(jl_symbol("Task"),
-                        NULL,
-                        jl_any_type,
-                        jl_emptysvec,
-                        jl_perm_symsvec(11,
-                                        "next",
-                                        "queue",
-                                        "storage",
-                                        "state",
-                                        "donenotify",
-                                        "result",
-                                        "exception",
-                                        "backtrace",
-                                        "logstate",
-                                        "code",
-                                        "sticky"),
-                        jl_svec(11,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_sym_type,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_any_type,
-                                jl_bool_type),
-                        0, 1, 9);
-    jl_value_t *listt = jl_new_struct(jl_uniontype_type, jl_task_type, jl_void_type);
-    jl_svecset(jl_task_type->types, 0, listt);
     done_sym = jl_symbol("done");
     failed_sym = jl_symbol("failed");
     runnable_sym = jl_symbol("runnable");
@@ -920,9 +900,12 @@ static void jl_init_basefiber(size_t ssize)
 void jl_init_root_task(void *stack_lo, void *stack_hi)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    ptls->current_task = (jl_task_t*)jl_gc_alloc(ptls, sizeof(jl_task_t),
-                                                 jl_task_type);
-    ptls->current_task->copy_stack = 0;
+    if (ptls->root_task == NULL) {
+        ptls->root_task = (jl_task_t*)jl_gc_alloc(ptls, sizeof(jl_task_t), jl_task_type);
+        memset(ptls->root_task, 0, sizeof(jl_task_t));
+        ptls->root_task->tls = jl_nothing;
+    }
+    ptls->current_task = ptls->root_task;
     void *stack = stack_lo;
     size_t ssize = (char*)stack_hi - (char*)stack_lo;
 #ifndef _OS_WINDOWS_
@@ -931,12 +914,19 @@ void jl_init_root_task(void *stack_lo, void *stack_hi)
         ssize += ROOT_TASK_STACK_ADJUSTMENT; // sizeof stack is known exactly, but not where we are in that stack
     }
 #endif
-    ptls->current_task->stkbuf = stack;
-    ptls->current_task->bufsz = ssize;
+    if (always_copy_stacks) {
+        ptls->current_task->copy_stack = 1;
+        ptls->current_task->stkbuf = NULL;
+        ptls->current_task->bufsz = 0;
+    }
+    else {
+        ptls->current_task->copy_stack = 0;
+        ptls->current_task->stkbuf = stack;
+        ptls->current_task->bufsz = ssize;
+    }
     ptls->current_task->started = 1;
     ptls->current_task->next = jl_nothing;
     ptls->current_task->queue = jl_nothing;
-    ptls->current_task->tls = jl_nothing;
     ptls->current_task->state = runnable_sym;
     ptls->current_task->start = NULL;
     ptls->current_task->result = jl_nothing;
@@ -953,9 +943,15 @@ void jl_init_root_task(void *stack_lo, void *stack_hi)
     arraylist_new(&ptls->current_task->locks, 0);
 #endif
 
-    ptls->root_task = ptls->current_task;
-
-    jl_init_basefiber(JL_STACK_SIZE);
+    if (always_copy_stacks) {
+        ptls->stackbase = stack_hi;
+        ptls->stacksize = ssize;
+        if (jl_setjmp(ptls->base_ctx.uc_mcontext, 0))
+            start_task();
+    }
+    else {
+        jl_init_basefiber(JL_STACK_SIZE);
+    }
 }
 
 JL_DLLEXPORT int jl_is_task_started(jl_task_t *t)
