@@ -29,10 +29,11 @@ Standard library changes
 ------------------------
 
 * `Regex` can now be multiplied (`*`) and exponentiated (`^`), like strings ([#23422]).
-* Cmd interpolation (`` `$(x::Cmd) a b c` `` where) now propagates `x`'s process flags
+* `Cmd` interpolation (`` `$(x::Cmd) a b c` `` where) now propagates `x`'s process flags
   (environment, flags, working directory, etc) if `x` is the first interpolant and errors
   otherwise ([#24353]).
 * `IPAddr` subtypes now behave like scalars when used in broadcasting ([#32133]).
+* `clamp` can now handle missing values ([#31066]).
 
 #### Libdl
 
@@ -42,7 +43,6 @@ Standard library changes
 
 * The BLAS submodule no longer exports `dot`, which conflicts with that in LinearAlgebra ([#31838]).
 * `diagm` and `spdiagm` now accept optional `m,n` initial arguments to specify a size ([#31654]).
-
 * `Hessenberg` factorizations `H` now support efficient shifted solves `(H+µI) \ b` and determinants, and use a specialized tridiagonal factorization for Hermitian matrices. There is also a new `UpperHessenberg` matrix type ([#31853]).
 
 #### SparseArrays
@@ -50,6 +50,7 @@ Standard library changes
 
 #### Dates
 
+* `DateTime` and `Time` formatting/parsing now supports 12-hour clocks with AM/PM via `I` and `p` codes, similar to `strftime` ([#32308]).
 * Fixed `repr` such that it displays `Time` as it would be entered in Julia ([#32103]).
 
 #### Sockets
