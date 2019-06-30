@@ -27,8 +27,6 @@ export
     unlink,
     walkdir
 
-import .Base.RefValue
-
 # get and set current directory
 
 """
@@ -48,11 +46,21 @@ julia> pwd()
 ```
 """
 function pwd()
-    b = Vector{UInt8}(undef, 1024)
-    len = RefValue{Csize_t}(length(b))
-    uv_error(:getcwd, ccall(:uv_cwd, Cint, (Ptr{UInt8}, Ptr{Csize_t}), b, len))
-    String(b[1:len[]])
+    buf = Base.StringVector(AVG_PATH - 1) # space for null-terminator implied by StringVector
+    sz = RefValue{Csize_t}(length(buf) + 1) # total buffer size including null
+    while true
+        rc = ccall(:uv_cwd, Cint, (Ptr{UInt8}, Ptr{Csize_t}), buf, sz)
+        if rc == 0
+            resize!(buf, sz[])
+            return String(buf)
+        elseif rc == Base.UV_ENOBUFS
+            resize!(buf, sz[] - 1) # space for null-terminator implied by StringVector
+        else
+            uv_error(:cwd, rc)
+        end
+    end
 end
+
 
 """
     cd(dir::AbstractString=homedir())
@@ -537,7 +545,7 @@ function mktempdir(parent=tempdir(); prefix=temp_prefix)
     try
         ret = ccall(:uv_fs_mkdtemp, Int32,
                     (Ptr{Cvoid}, Ptr{Cvoid}, Cstring, Ptr{Cvoid}),
-                    eventloop(), req, tpath, C_NULL)
+                    C_NULL, req, tpath, C_NULL)
         if ret < 0
             ccall(:uv_fs_req_cleanup, Cvoid, (Ptr{Cvoid},), req)
             uv_error("mktempdir", ret)
@@ -623,8 +631,8 @@ function readdir(path::AbstractString)
     uv_readdir_req = zeros(UInt8, ccall(:jl_sizeof_uv_fs_t, Int32, ()))
 
     # defined in sys.c, to call uv_fs_readdir, which sets errno on error.
-    err = ccall(:jl_uv_fs_scandir, Int32, (Ptr{Cvoid}, Ptr{UInt8}, Cstring, Cint, Ptr{Cvoid}),
-                eventloop(), uv_readdir_req, path, 0, C_NULL)
+    err = ccall(:uv_fs_scandir, Int32, (Ptr{Cvoid}, Ptr{UInt8}, Cstring, Cint, Ptr{Cvoid}),
+                C_NULL, uv_readdir_req, path, 0, C_NULL)
     err < 0 && throw(SystemError("unable to read directory $path", -err))
     #uv_error("unable to read directory $path", err)
 
@@ -636,7 +644,7 @@ function readdir(path::AbstractString)
     end
 
     # Clean up the request string
-    ccall(:jl_uv_fs_req_cleanup, Cvoid, (Ptr{UInt8},), uv_readdir_req)
+    ccall(:uv_fs_req_cleanup, Cvoid, (Ptr{UInt8},), uv_readdir_req)
 
     return entries
 end
@@ -808,9 +816,9 @@ Return the target location a symbolic link `path` points to.
 function readlink(path::AbstractString)
     req = Libc.malloc(_sizeof_uv_fs)
     try
-        ret = ccall(:jl_uv_fs_readlink, Int32,
+        ret = ccall(:uv_fs_readlink, Int32,
             (Ptr{Cvoid}, Ptr{Cvoid}, Cstring, Ptr{Cvoid}),
-            eventloop(), req, path, C_NULL)
+            C_NULL, req, path, C_NULL)
         if ret < 0
             ccall(:uv_fs_req_cleanup, Cvoid, (Ptr{Cvoid},), req)
             uv_error("readlink", ret)
