@@ -31,7 +31,7 @@ Standard library changes
 ------------------------
 
 * `Regex` can now be multiplied (`*`) and exponentiated (`^`), like strings ([#23422]).
-* `Cmd` interpolation (`` `$(x::Cmd) a b c` `` where) now propagates `x`'s process flags
+* `Cmd` interpolation (``` `$(x::Cmd) a b c` ``` where) now propagates `x`'s process flags
   (environment, flags, working directory, etc) if `x` is the first interpolant and errors
   otherwise ([#24353]).
 * Zero-dimensional arrays are now consistently preserved in the return values of mathematical
@@ -40,6 +40,7 @@ Standard library changes
   when operating over zero-dimensional arrays ([#32122]).
 * `IPAddr` subtypes now behave like scalars when used in broadcasting ([#32133]).
 * `clamp` can now handle missing values ([#31066]).
+* `empty` now accepts a `NamedTuple` ([#32534])
 
 #### Libdl
 
