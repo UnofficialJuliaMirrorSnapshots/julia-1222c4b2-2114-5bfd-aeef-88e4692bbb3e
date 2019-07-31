@@ -55,6 +55,8 @@ end
     @test_throws ArgumentError sparse([1,2,4], [1,2,3], [1,2,3], 3, 3)
     @test_throws ArgumentError sparse([1,2,3], [1,2,4], [1,2,3], 3, 3)
     @test isequal(sparse(Int[], Int[], Int[], 0, 0), SparseMatrixCSC(0, 0, Int[1], Int[], Int[]))
+    @test isequal(sparse(big.([1,1,1,2,2,3,4,5]),big.([1,2,3,2,3,3,4,5]),big.([1,2,4,3,5,6,7,8]), 6, 6),
+        SparseMatrixCSC(6, 6, big.([1,2,4,7,8,9,9]), big.([1,1,2,1,2,3,4,5]), big.([1,2,3,4,5,6,7,8])))
     @test sparse(Any[1,2,3], Any[1,2,3], Any[1,1,1]) == sparse([1,2,3], [1,2,3], [1,1,1])
     @test sparse(Any[1,2,3], Any[1,2,3], Any[1,1,1], 5, 4) == sparse([1,2,3], [1,2,3], [1,1,1], 5, 4)
 end
@@ -1502,6 +1504,13 @@ end
     @test float(A) == float(Array(A))
 end
 
+@testset "complex" begin
+    A = sprand(Bool, 5, 5, 0.0)
+    @test eltype(complex(A)) == Complex{Bool}
+    A = sprand(Bool, 5, 5, 0.2)
+    @test complex(A) == complex(Array(A))
+end
+
 @testset "sparsevec" begin
     local A = sparse(fill(1, 5, 5))
     @test sparsevec(A) == fill(1, 25)
@@ -2681,6 +2690,17 @@ end
     @test_throws ArgumentError sparse(UInt8.(1:254), fill(UInt8(1), 254), fill(1, 254), 255, 256)
     # n, m maximal
     @test sparse(UInt8.(1:254), fill(UInt8(1), 254), fill(1, 254), 255, 255) !== nothing
+end
+
+@testset "sppromote and sparse matmul" begin
+    A = SparseMatrixCSC{Float32, Int8}(2, 2, Int8[1, 2, 3], Int8[1, 2], Float32[1., 2.])
+    B = SparseMatrixCSC{ComplexF32, Int32}(2, 2, Int32[1, 2, 3], Int32[1, 2], ComplexF32[1. + im, 2. - im])
+    @test A*transpose(B)                  ≈ Array(A) * transpose(Array(B))
+    @test A*adjoint(B)                    ≈ Array(A) * adjoint(Array(B))
+    @test transpose(A)*B                  ≈ transpose(Array(A)) * Array(B)
+    @test transpose(A)*transpose(B)       ≈ transpose(Array(A)) * transpose(Array(B))
+    @test adjoint(B)*A                    ≈ adjoint(Array(B)) * Array(A)
+    @test adjoint(B)*adjoint(complex.(A)) ≈ adjoint(Array(B)) * adjoint(Array(complex.(A)))
 end
 
 end # module
