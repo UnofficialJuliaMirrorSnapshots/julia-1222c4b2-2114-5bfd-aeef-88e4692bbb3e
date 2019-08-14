@@ -536,10 +536,13 @@ static void record_var_occurrence(jl_varbinding_t *vb, jl_stenv_t *e, int param)
 {
     if (vb != NULL && param) {
         // saturate counters at 2; we don't need values bigger than that
-        if (param == 2 && (vb->right ? e->Rinvdepth : e->invdepth) > vb->depth0 && vb->occurs_inv < 2)
-            vb->occurs_inv++;
-        else if (vb->occurs_cov < 2)
+        if (param == 2 && (vb->right ? e->Rinvdepth : e->invdepth) > vb->depth0) {
+            if (vb->occurs_inv < 2)
+                vb->occurs_inv++;
+        }
+        else if (vb->occurs_cov < 2) {
             vb->occurs_cov++;
+        }
     }
 }
 
@@ -1275,7 +1278,15 @@ static int subtype(jl_value_t *x, jl_value_t *y, jl_stenv_t *e, int param)
             jl_value_t *tp0 = jl_tparam0(yd);
             if (!jl_is_typevar(tp0) || !jl_is_kind(x))
                 return 0;
-            return subtype((jl_value_t*)jl_type_type, y, e, param);
+            // DataType.super is special, so `DataType <: Type{T}` (T free) needs special handling.
+            // The answer is true iff `T` has full bounds (as in `Type`), but this needs to
+            // be checked at the same depth where `Type{T}` occurs --- the depth of the LHS
+            // doesn't matter because it (e.g. `DataType`) doesn't actually contain the variable.
+            int saved = e->invdepth;
+            e->invdepth = e->Rinvdepth;
+            int issub = subtype((jl_value_t*)jl_type_type, y, e, param);
+            e->invdepth = saved;
+            return issub;
         }
         while (xd != jl_any_type && xd->name != yd->name) {
             if (xd->super == NULL)
@@ -1665,6 +1676,8 @@ JL_DLLEXPORT int jl_obvious_subtype(jl_value_t *x, jl_value_t *y, int *subtype)
                 assert(vy != JL_VARARG_NONE && istuple && iscov);
                 jl_value_t *a1 = (vx != JL_VARARG_NONE && i >= npx - 1) ? vxt : jl_tparam(x, i);
                 jl_value_t *b = jl_unwrap_vararg(jl_tparam(y, i));
+                if (jl_is_typevar(b) && var_occurs_inside(y, (jl_tvar_t*)b, 0, 1))
+                    return 0;
                 if (nparams_expanded_x > npy && jl_is_typevar(b) && concrete_min(a1) > 1) {
                     // diagonal rule for 2 or more elements: they must all be concrete on the LHS
                     *subtype = 0;

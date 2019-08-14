@@ -6,6 +6,7 @@ New language features
 
 * Support for Unicode 12.1.0 ([#32002]).
 * Methods can now be added to an abstract type ([#31916]).
+* Support for unicode bold-digits and double-struck digits 0 through 9 as valid identifiers ([#32838]).
 
 Language changes
 ----------------
@@ -20,6 +21,8 @@ Multi-threading changes
   ([#32309], [#32174], [#31981], [#32421]).
 * The global random number generator (`GLOBAL_RNG`) is now thread-safe (and thread-local) ([#32407]).
 * New experimental `Threads.@spawn` macro that runs a task on any available thread ([#32600]).
+* Simplified the `Channel` constructor, which is now easier to read and more idiomatic julia.
+  The old constructor (which used kwargs) is still available, but use is discouraged ([#30855], [#32818]).
 
 Build system changes
 --------------------
@@ -31,8 +34,10 @@ New library functions
 * `findfirst`, `findlast`, `findnext` and `findprev` now accept a character as first argument
   to search for that character in a string passed as the second argument ([#31664]).
 * New `findall(pattern, string)` method where `pattern` is a string or regex ([#31834]).
+* `count(pattern, string)` gives the number of things `findall` would match ([#32849]).
 * `istaskfailed` is now documented and exported, like its siblings `istaskdone` and `istaskstarted` ([#32300]).
 * `RefArray` and `RefValue` objects now accept index `CartesianIndex()` in  `getindex` and `setindex!` ([#32653])
+* Added `sincosd(x)` to simultaneously compute the sine and cosine of `x`, where `x` is in degrees ([#30134]).
 
 Standard library changes
 ------------------------
@@ -52,6 +57,8 @@ Standard library changes
 * `mod` now accepts a unit range as the second argument to easily perform offset modular arithmetic to ensure the result is inside the range ([#32628]).
 * `Sockets.recvfrom` now returns both host and port as an InetAddr ([#32729]).
 * `nothing` can now be `print`ed, and interplated into strings etc. as the string `"nothing"`. It is still not permitted to be interplated into Cmds (i.e. ``echo `$(nothing)` `` will still error without running anything.) ([#32148])
+* When `open` is called with a function, command, and keyword argument (e.g. ```open(`ls`, read=true) do f ...```)
+  it now correctly throws a `ProcessFailedException` like other similar calls ([#32193]).
 
 #### Libdl
 

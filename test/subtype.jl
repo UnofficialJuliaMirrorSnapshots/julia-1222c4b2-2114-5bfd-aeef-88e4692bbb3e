@@ -393,6 +393,9 @@ function test_5()
 
     @test isequal_type(Ref{Tuple{Union{Int,Int8},Int16,T}} where T,
                        Ref{Union{Tuple{Int,Int16,S},Tuple{Int8,Int16,S}}} where S)
+
+    # issue #32726
+    @test Tuple{Type{Any}, Int, Float64, String} <: Tuple{Type{T}, Vararg{T}} where T
 end
 
 # tricky type variable lower bounds
@@ -1669,3 +1672,7 @@ c32703(::Type{<:Str{C}}, str::Str{C}) where {C<:CSE} = str
 @test_broken typeintersect(Tuple{Vector{Vector{Float32}},Matrix,Matrix},
                            Tuple{Vector{V},Matrix{Int},Matrix{S}} where {S, V<:AbstractVector{S}}) ==
              Tuple{Array{Array{Float32,1},1},Array{Int,2},Array{Float32,2}}
+
+@testintersect(Tuple{Pair{Int, DataType}, Any},
+               Tuple{Pair{A, B} where B<:Type, Int} where A,
+               Tuple{Pair{Int, DataType}, Int})
