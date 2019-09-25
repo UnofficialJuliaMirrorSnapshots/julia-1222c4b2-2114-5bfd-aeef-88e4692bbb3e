@@ -36,6 +36,8 @@ Standard library changes
 
 * The methods of `mktemp` and `mktempdir` which take a function body to pass temporary paths to no longer throw errors if the path is already deleted when the function body returns ([#33091]).
 
+* Verbose `display` of `Char` (`text/plain` output) now shows the codepoint value in standard-conforming `"U+XXXX"` format ([#33291]).
+
 #### Libdl
 
 #### LinearAlgebra
@@ -44,11 +46,17 @@ Standard library changes
 
 * `dot` now admits a 3-argument method `dot(x, A, y)` to compute generalized dot products `dot(x, A*y)`, but without computing and storing the intermediate result `A*y` ([#32739]).
 
+#### Random
+
+
+* `AbstractRNG`s now behave like scalars when used in broadcasting ([#33213]).
+
+* Products involving sparse arrays now allow more general sparse `eltype`s, such as `StaticArrays` ([#33205])
+
+
 #### SparseArrays
 
-
 #### Dates
-
 
 #### Statistics
 
