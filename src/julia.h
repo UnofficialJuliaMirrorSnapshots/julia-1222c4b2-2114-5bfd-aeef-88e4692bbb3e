@@ -173,7 +173,7 @@ JL_EXTENSION typedef struct {
     size_t length;
 #endif
     jl_array_flags_t flags;
-    uint16_t elsize;
+    uint16_t elsize;  // element size including alignment (dim 1 memory stride)
     uint32_t offset;  // for 1-d only. does not need to get big.
     size_t nrows;
     union {
@@ -746,7 +746,13 @@ JL_DLLEXPORT int64_t jl_gc_total_bytes(void);
 JL_DLLEXPORT uint64_t jl_gc_total_hrtime(void);
 JL_DLLEXPORT int64_t jl_gc_diff_total_bytes(void);
 
-JL_DLLEXPORT void jl_gc_collect(int);
+typedef enum {
+    JL_GC_AUTO = 0,         // use heuristics to determine the collection type
+    JL_GC_FULL = 1,         // force a full collection
+    JL_GC_INCREMENTAL = 2,  // force an incremental collection
+} jl_gc_collection_t;
+
+JL_DLLEXPORT void jl_gc_collect(jl_gc_collection_t);
 
 JL_DLLEXPORT void jl_gc_add_finalizer(jl_value_t *v, jl_function_t *f);
 JL_DLLEXPORT void jl_finalize(jl_value_t *o);
@@ -1472,7 +1478,7 @@ JL_DLLEXPORT void JL_NORETURN jl_type_error(const char *fname,
                                             jl_value_t *got JL_MAYBE_UNROOTED);
 JL_DLLEXPORT void JL_NORETURN jl_type_error_rt(const char *fname,
                                                const char *context,
-                                               jl_value_t *ty,
+                                               jl_value_t *ty JL_MAYBE_UNROOTED,
                                                jl_value_t *got JL_MAYBE_UNROOTED);
 JL_DLLEXPORT void JL_NORETURN jl_undefined_var_error(jl_sym_t *var);
 JL_DLLEXPORT void JL_NORETURN jl_bounds_error(jl_value_t *v,

@@ -13,6 +13,8 @@ Language changes
 
 * Calling `show` or `repr` on an `undef`/`UndefInitializer()` array initializer now shows valid Julia code ([#33211]).
 
+* Calling `show` or `repr` on a 0-dimensional `AbstractArray` now shows valid code for creating an equivalent 0-dimensional array, instead of only showing the contained value. ([#33206])
+
 Multi-threading changes
 -----------------------
 
@@ -40,6 +42,7 @@ Standard library changes
 
 * Verbose `display` of `Char` (`text/plain` output) now shows the codepoint value in standard-conforming `"U+XXXX"` format ([#33291]).
 
+
 #### Libdl
 
 #### LinearAlgebra
@@ -47,6 +50,8 @@ Standard library changes
 * `qr` and `qr!` functions support `blocksize` keyword argument ([#33053]).
 
 * `dot` now admits a 3-argument method `dot(x, A, y)` to compute generalized dot products `dot(x, A*y)`, but without computing and storing the intermediate result `A*y` ([#32739]).
+
+* `ldlt` and non-pivoted `lu` now throw a new `ZeroPivotException` type ([#33372]).
 
 #### Random
 
