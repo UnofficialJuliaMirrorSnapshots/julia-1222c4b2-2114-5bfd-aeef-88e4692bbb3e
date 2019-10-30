@@ -8,6 +8,9 @@ New language features
 
 * `import` now allows quoted symbols, e.g. `import Base.:+` ([#33158]).
 
+* Function composition now supports multiple functions: `∘(f, g, h) = f ∘ g ∘ h`
+and splatting `∘(fs...)` for composing an iterable collection of functions ([#33568]).
+
 Language changes
 ----------------
 
@@ -54,6 +57,8 @@ Standard library changes
 * `dot` now admits a 3-argument method `dot(x, A, y)` to compute generalized dot products `dot(x, A*y)`, but without computing and storing the intermediate result `A*y` ([#32739]).
 
 * `ldlt` and non-pivoted `lu` now throw a new `ZeroPivotException` type ([#33372]).
+
+* `cond(A, p)` with `p=1` or `p=Inf` now computes the exact condition number instead of an estimate ([#33547]).
 
 #### Random
 

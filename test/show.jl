@@ -351,6 +351,10 @@ end
 @test sprint(show, :+) == ":+"
 @test sprint(show, :end) == ":end"
 
+# make sure :var"'" prints correctly
+@test sprint(show, Symbol("'")) == "Symbol(\"'\")"
+@test_repr "var\"'\" = 5"
+
 # issue #32408: Printing of names which are invalid identifiers
 # Invalid identifiers which need `var` quoting:
 @test sprint(show, Expr(:call, :foo, Symbol("##")))   == ":(foo(var\"##\"))"
@@ -637,7 +641,6 @@ else
 end
 
 # Method location correction (Revise integration)
-methloc = Base.methodloc_callback[]
 dummyloc(m::Method) = :nofile, 123456789
 Base.methodloc_callback[] = dummyloc
 let repr = sprint(show, "text/plain", methods(Base.inbase))
@@ -646,7 +649,7 @@ end
 let repr = sprint(show, "text/html", methods(Base.inbase))
     @test occursin("nofile:123456789", repr)
 end
-Base.methodloc_callback[] = methloc
+Base.methodloc_callback[] = nothing
 
 @testset "matrix printing" begin
     # print_matrix should be able to handle small and large objects easily, test by
@@ -1612,3 +1615,9 @@ end
     @test startswith(showstr(Array{Int32, 0}(undef)), "fill(")
     @test startswith(replstr(Array{Int32, 0}(undef)), "0-dimensional Array{Int32,0}:\n")
 end
+
+# issue #31402, Print Symbol("true") as Symbol("true") instead of :true
+@test sprint(show, Symbol(true)) == "Symbol(\"true\")"
+@test sprint(show, Symbol("true")) == "Symbol(\"true\")"
+@test sprint(show, Symbol(false)) == "Symbol(\"false\")"
+@test sprint(show, Symbol("false")) == "Symbol(\"false\")"

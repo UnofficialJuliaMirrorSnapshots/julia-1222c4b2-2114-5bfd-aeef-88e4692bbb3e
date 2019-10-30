@@ -783,6 +783,7 @@ is_id_start_char(c::AbstractChar) = ccall(:jl_id_start_char, Cint, (UInt32,), c)
 is_id_char(c::AbstractChar) = ccall(:jl_id_char, Cint, (UInt32,), c) != 0
 function isidentifier(s::AbstractString)
     isempty(s) && return false
+    (s == "true" || s == "false") && return false
     c, rest = Iterators.peel(s)
     is_id_start_char(c) || return false
     return all(is_id_char, rest)
@@ -993,7 +994,7 @@ end
 # * Print valid identifiers & operators literally; also macros names if allow_macroname=true
 # * Escape invalid identifiers with var"" syntax
 function show_sym(io::IO, sym; allow_macroname=false)
-    if isidentifier(sym) || isoperator(sym)
+    if isidentifier(sym) || (isoperator(sym) && sym !== Symbol("'"))
         print(io, sym)
     elseif allow_macroname && (sym_str = string(sym); startswith(sym_str, '@'))
         print(io, '@')
@@ -1049,7 +1050,7 @@ end
 function show_unquoted_quote_expr(io::IO, @nospecialize(value), indent::Int, prec::Int)
     if isa(value, Symbol) && !(value in quoted_syms)
         s = string(value)
-        if isidentifier(s) || isoperator(value)
+        if isidentifier(s) || (isoperator(value) && value !== Symbol("'"))
             print(io, ":")
             print(io, value)
         else
